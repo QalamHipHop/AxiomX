@@ -1,11 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 
-export interface BiometricData {
-  fingerprintHash: string;
-  heartRate: number;
-  emotionalState: string; // e.g., "calm", "excited", "stressed"
-  timestamp: number;
+export interface IdentityGenome {
+  foundation: {
+    biometricHash: string;
+    deviceAnchor: string;
+    authProofs: string[];
+  };
+  behavioral: {
+    interactionRhythms: number;
+    consistencyScore: number;
+    engagementMetrics: any;
+  };
+  trust: {
+    relationships: string[];
+    reputationScore: number;
+    reliabilityHistory: any[];
+  };
+  evolution: {
+    progressionHistory: any[];
+    growthTrajectory: number;
+    lastUpdated: number;
+  };
+  contribution: {
+    ecosystemParticipation: number;
+    governanceEngagement: number;
+    valueCreated: number;
+  };
 }
 
 @Injectable()
@@ -13,39 +34,58 @@ export class AxiomIDService {
   private readonly logger = new Logger(AxiomIDService.name);
 
   /**
-   * Generates a unique mathematical identity formula based on biometric and emotional data.
-   * This is a simplified representation of the concept.
+   * Generates the Human Digital Genome (Identity Field) using multi-layered signals.
    */
-  generateIdentityFormula(data: BiometricData): string {
-    const salt = crypto.randomBytes(16).toString('hex');
-    const input = `${data.fingerprintHash}-${data.heartRate}-${data.emotionalState}-${data.timestamp}-${salt}`;
+  generateIdentityField(genome: IdentityGenome): string {
+    const rawData = JSON.stringify(genome);
+    // Create a high-dimensional mathematical representation (formula)
+    const formula = crypto.createHash('sha384').update(rawData).digest('hex');
     
-    // Using SHA-256 to create a deterministic but unique hash representing the "formula"
-    const formulaHash = crypto.createHash('sha256').update(input).digest('hex');
-    
-    // In a real scenario, this would involve complex mathematical mapping
-    // for example, mapping emotional states to coefficients in a polynomial.
-    return formulaHash;
+    this.logger.log(`Generated new Identity Field Formula: ${formula.substring(0, 16)}...`);
+    return formula;
   }
 
   /**
-   * Calculates the "Identity Value" based on the formula and current market conditions.
-   * This value can fluctuate, representing the "relative zero" concept.
+   * Calculates the Human Continuity Asset (HCA) value based on the genome's evolution.
    */
-  calculateIdentityValue(formula: string): number {
-    // Mock logic: value is derived from the formula's hash properties
-    const hashInt = parseInt(formula.substring(0, 8), 16);
-    const baseValue = (hashInt % 1000) / 1000; // Value between 0 and 1
+  calculateHCAValue(genome: IdentityGenome): number {
+    const { behavioral, trust, evolution, contribution } = genome;
     
-    return baseValue;
+    // Weighted algorithm for HCA calculation
+    const value = 
+      (behavioral.consistencyScore * 0.15) +
+      (trust.reputationScore * 0.35) +
+      (evolution.growthTrajectory * 0.25) +
+      (contribution.valueCreated * 0.25);
+      
+    return value;
   }
 
   /**
-   * Verifies the identity using Zero-Knowledge Proof principles (mocked).
+   * Updates the Evolution Layer of the Digital Genome.
    */
-  async verifyIdentity(proof: any, publicInputs: any): Promise<boolean> {
-    // In a production system, this would use a library like snarkjs to verify a ZK-SNARK proof.
-    this.logger.log('Verifying AxiomID proof...');
-    return true; 
+  evolveGenome(currentGenome: IdentityGenome, newSignals: any): IdentityGenome {
+    const updatedGenome = { ...currentGenome };
+    
+    // Update logic for behavioral and evolution layers
+    updatedGenome.evolution.progressionHistory.push({
+      timestamp: Date.now(),
+      signals: newSignals
+    });
+    updatedGenome.evolution.lastUpdated = Date.now();
+    
+    return updatedGenome;
+  }
+
+  /**
+   * Generates a Zero-Knowledge Proof for identity verification without disclosure.
+   */
+  generateZKProof(field: string, requiredAttribute: string): any {
+    // Mock ZK-Proof generation
+    return {
+      proof: `zkp_${crypto.randomBytes(16).toString('hex')}`,
+      publicInput: field.substring(0, 8),
+      attribute: requiredAttribute
+    };
   }
 }
