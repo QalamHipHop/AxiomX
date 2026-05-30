@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # Placeholder for future services like backend, database, etc.
+  # Example:
+  # backend:
+  #   build: ./apps/backend
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./apps/backend:/app
+  #   depends_on:
+  #     - database
+  # database:
+  #   image: postgres:13
+  #   environment:
+  #     POSTGRES_DB: axiomx_db
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #   ports:
+  #     - "5432:5432"
+  "
+  #   volumes:
+  #     - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
