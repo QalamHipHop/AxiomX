@@ -1,15 +1,20 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import { TradingService } from './trading.service';
+import { TradingServiceUpgraded } from './trading.service.upgraded';
+import { SyntheticLimitOrderService } from './synthetic-limit-order.service';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Trading')
 @Controller('trading')
 export class TradingController {
-  constructor(private tradingService: TradingService) {}
+  constructor(
+    private readonly tradingService: TradingService,
+    private readonly tradingServiceUpgraded: TradingServiceUpgraded,
+    private readonly syntheticOrderService: SyntheticLimitOrderService,
+  ) {}
 
   @Get('exchanges')
-  @ApiOperation({ summary: 'Get all available exchanges' })
-  @ApiResponse({ status: 200, description: 'List of available exchanges' })
+  @ApiOperation({ summary: 'List all supported exchanges' })
   async getExchanges() {
     return {
       exchanges: await this.tradingService.getAllExchanges(),
@@ -18,39 +23,43 @@ export class TradingController {
 
   @Get('exchanges/:exchangeName/info')
   @ApiOperation({ summary: 'Get exchange information' })
-  @ApiResponse({ status: 200, description: 'Exchange information' })
   async getExchangeInfo(@Param('exchangeName') exchangeName: string) {
     return this.tradingService.getExchangeInfo(exchangeName);
   }
 
-  @Get('exchanges/:exchangeName/markets')
-  @ApiOperation({ summary: 'Get markets for an exchange' })
-  @ApiResponse({ status: 200, description: 'List of markets' })
-  async getMarkets(@Param('exchangeName') exchangeName: string) {
-    const markets = await this.tradingService.getExchangeMarkets(exchangeName);
-    return { exchangeName, markets };
+  @Get('route')
+  @ApiOperation({ summary: 'Find optimal trading route' })
+  async getRoute(
+    @Query('symbol') symbol: string,
+    @Query('amount') amount: number,
+    @Query('side') side: 'buy' | 'sell',
+    @Query('slippage') slippage?: number,
+  ) {
+    return this.tradingServiceUpgraded.findOptimalRoute(symbol, amount, side, slippage);
   }
 
-  @Get('exchanges/:exchangeName/orderbook/:symbol')
-  @ApiOperation({ summary: 'Get order book for a symbol' })
-  @ApiResponse({ status: 200, description: 'Order book data' })
-  async getOrderBook(
-    @Param('exchangeName') exchangeName: string,
-    @Param('symbol') symbol: string,
-    @Query('limit') limit?: number,
-  ) {
-    const orderBook = await this.tradingService.getOrderBook(exchangeName, symbol, limit);
-    return { exchangeName, symbol, orderBook };
+  @Post('execute')
+  @ApiOperation({ summary: 'Execute trade with security and routing' })
+  async executeTrade(@Body() tradeData: any) {
+    return this.tradingServiceUpgraded.executeTrade(
+      tradeData.symbol,
+      tradeData.amount,
+      tradeData.side,
+      tradeData.tokenInfo
+    );
   }
 
-  @Get('exchanges/:exchangeName/ticker/:symbol')
-  @ApiOperation({ summary: 'Get ticker for a symbol' })
-  @ApiResponse({ status: 200, description: 'Ticker data' })
-  async getTicker(
-    @Param('exchangeName') exchangeName: string,
-    @Param('symbol') symbol: string,
-  ) {
-    const ticker = await this.tradingService.getTicker(exchangeName, symbol);
-    return { exchangeName, symbol, ticker };
+  @Post('synthetic-limit')
+  @ApiOperation({ summary: 'Create a synthetic limit order' })
+  async createSyntheticOrder(@Body() orderData: any) {
+    return this.syntheticOrderService.createOrder(
+      orderData.userId,
+      orderData.symbol,
+      orderData.side,
+      orderData.amount,
+      orderData.triggerPrice,
+      orderData.limitPrice,
+      orderData.expiresInHours
+    );
   }
 }

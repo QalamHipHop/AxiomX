@@ -1,25 +1,27 @@
-/**
- * Synthetic Limit Order Engine
- * Monitors price and auto-executes orders when conditions are met
- * Uses database persistence and WebSocket real-time monitoring
- */
-
-import { Injectable, Logger } from '@nestjs/common';
-import { SyntheticLimitOrder } from '@axiomx/shared';
-
-interface SyntheticOrderStore {
-  [key: string]: SyntheticLimitOrder;
-}
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { SyntheticLimitOrderEntity } from './synthetic-limit-order.entity';
 
 @Injectable()
-export class SyntheticLimitOrderService {
+export class SyntheticLimitOrderService implements OnModuleInit {
   private readonly logger = new Logger(SyntheticLimitOrderService.name);
-  private orders: SyntheticOrderStore = {};
   private priceMonitors: Map<string, NodeJS.Timeout> = new Map();
 
-  /**
-   * Create a new synthetic limit order
-   */
+  constructor(
+    @InjectRepository(SyntheticLimitOrderEntity)
+    private orderRepository: Repository<SyntheticLimitOrderEntity>,
+  ) {}
+
+  async onModuleInit() {
+    this.logger.log('Initializing synthetic limit order monitors...');
+    const activeOrders = await this.orderRepository.find({ where: { status: 'active' } });
+    for (const order of activeOrders) {
+      this.startMonitoring(order.id);
+    }
+    this.logger.log(`Started monitoring ${activeOrders.length} active orders`);
+  }
+
   async createOrder(
     userId: string,
     symbol: string,
@@ -28,74 +30,38 @@ export class SyntheticLimitOrderService {
     triggerPrice: number,
     limitPrice: number,
     expiresInHours: number = 24
-  ): Promise<SyntheticLimitOrder> {
-    const orderId = `slo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  ): Promise<SyntheticLimitOrderEntity> {
     const now = Date.now();
-
-    const order: SyntheticLimitOrder = {
-      id: orderId,
+    const order = this.orderRepository.create({
       userId,
       symbol,
       side,
       amount,
       triggerPrice,
       limitPrice,
-      createdAt: now,
       expiresAt: now + expiresInHours * 3600000,
       status: 'active',
-    };
+    });
 
-    this.orders[orderId] = order;
-    this.logger.log(
-      `Created synthetic limit order ${orderId} for ${symbol} at trigger ${triggerPrice}`
-    );
-
-    // Start monitoring this order
-    this.startMonitoring(orderId);
-
-    return order;
+    const savedOrder = await this.orderRepository.save(order);
+    this.startMonitoring(savedOrder.id);
+    
+    return savedOrder;
   }
 
-  /**
-   * Get order by ID
-   */
-  getOrder(orderId: string): SyntheticLimitOrder | undefined {
-    return this.orders[orderId];
-  }
-
-  /**
-   * Get all active orders for a user
-   */
-  getUserOrders(userId: string): SyntheticLimitOrder[] {
-    return Object.values(this.orders).filter(
-      (order) => order.userId === userId && order.status === 'active'
-    );
-  }
-
-  /**
-   * Cancel an order
-   */
-  async cancelOrder(orderId: string): Promise<boolean> {
-    const order = this.orders[orderId];
-    if (!order) {
-      return false;
-    }
+  async cancelOrder(orderId: string, userId: string): Promise<boolean> {
+    const order = await this.orderRepository.findOne({ where: { id: orderId, userId } });
+    if (!order) return false;
 
     order.status = 'canceled';
+    await this.orderRepository.save(order);
     this.stopMonitoring(orderId);
-    this.logger.log(`Canceled synthetic limit order ${orderId}`);
-
     return true;
   }
 
-  /**
-   * Start price monitoring for an order
-   */
   private startMonitoring(orderId: string): void {
-    const order = this.orders[orderId];
-    if (!order) return;
+    if (this.priceMonitors.has(orderId)) return;
 
-    // Check price every 5 seconds
     const monitor = setInterval(() => {
       this.checkAndExecute(orderId);
     }, 5000);
@@ -103,9 +69,6 @@ export class SyntheticLimitOrderService {
     this.priceMonitors.set(orderId, monitor);
   }
 
-  /**
-   * Stop monitoring an order
-   */
   private stopMonitoring(orderId: string): void {
     const monitor = this.priceMonitors.get(orderId);
     if (monitor) {
@@ -114,162 +77,48 @@ export class SyntheticLimitOrderService {
     }
   }
 
-  /**
-   * Check if order should be executed
-   */
   private async checkAndExecute(orderId: string): Promise<void> {
-    const order = this.orders[orderId];
+    const order = await this.orderRepository.findOne({ where: { id: orderId } });
     if (!order || order.status !== 'active') {
-      return;
-    }
-
-    // Check expiration
-    if (Date.now() > order.expiresAt) {
-      order.status = 'expired';
       this.stopMonitoring(orderId);
-      this.logger.log(`Synthetic limit order ${orderId} expired`);
       return;
     }
 
-    // Get current price (in production, fetch from routing engine)
-    const currentPrice = await this.getCurrentPrice(order.symbol);
+    if (Date.now() > Number(order.expiresAt)) {
+      order.status = 'expired';
+      await this.orderRepository.save(order);
+      this.stopMonitoring(orderId);
+      return;
+    }
 
-    // Check trigger condition
-    const shouldTrigger = this.checkTriggerCondition(
-      order.side,
-      currentPrice,
-      order.triggerPrice
-    );
+    const currentPrice = await this.getCurrentPrice(order.symbol);
+    const shouldTrigger = order.side === 'buy' 
+      ? currentPrice <= order.triggerPrice 
+      : currentPrice >= order.triggerPrice;
 
     if (shouldTrigger) {
-      await this.executeOrder(orderId, currentPrice);
+      await this.executeOrder(order, currentPrice);
     }
   }
 
-  /**
-   * Check if trigger condition is met
-   */
-  private checkTriggerCondition(
-    side: 'buy' | 'sell',
-    currentPrice: number,
-    triggerPrice: number
-  ): boolean {
-    if (side === 'buy') {
-      return currentPrice <= triggerPrice;
-    } else {
-      return currentPrice >= triggerPrice;
-    }
-  }
-
-  /**
-   * Execute the order
-   */
-  private async executeOrder(orderId: string, executionPrice: number): Promise<void> {
-    const order = this.orders[orderId];
-    if (!order) return;
-
+  private async executeOrder(order: SyntheticLimitOrderEntity, executionPrice: number): Promise<void> {
     try {
-      // Validate execution price against limit
-      const isValidPrice = this.validateExecutionPrice(
-        order.side,
-        executionPrice,
-        order.limitPrice
-      );
-
-      if (!isValidPrice) {
-        this.logger.warn(
-          `Order ${orderId} triggered but execution price ${executionPrice} exceeds limit ${order.limitPrice}`
-        );
-        return;
-      }
-
-      // In production, execute through routing engine
+      // In production, integrate with SmartRoutingEngine here
       order.status = 'executed';
       order.executedAt = Date.now();
-      this.stopMonitoring(orderId);
-
-      this.logger.log(
-        `Executed synthetic limit order ${orderId} at price ${executionPrice}`
-      );
-
-      // Emit event for WebSocket notification
-      this.emitExecutionEvent(order);
+      await this.orderRepository.save(order);
+      this.stopMonitoring(order.id);
+      this.logger.log(`Executed order ${order.id} at ${executionPrice}`);
     } catch (error) {
-      this.logger.error(`Failed to execute order ${orderId}:`, error);
+      this.logger.error(`Execution failed for ${order.id}:`, error);
       order.status = 'failed';
-      this.stopMonitoring(orderId);
+      await this.orderRepository.save(order);
+      this.stopMonitoring(order.id);
     }
   }
 
-  /**
-   * Validate execution price against limit
-   */
-  private validateExecutionPrice(
-    side: 'buy' | 'sell',
-    executionPrice: number,
-    limitPrice: number
-  ): boolean {
-    if (side === 'buy') {
-      return executionPrice <= limitPrice;
-    } else {
-      return executionPrice >= limitPrice;
-    }
-  }
-
-  /**
-   * Get current price for a symbol (mock implementation)
-   */
   private async getCurrentPrice(symbol: string): Promise<number> {
-    // In production, fetch from routing engine or price feed
+    // Placeholder: in production, this should use the price feed from CCXT or WebSocket
     return 50000 + Math.random() * 1000;
-  }
-
-  /**
-   * Emit execution event for WebSocket
-   */
-  private emitExecutionEvent(order: SyntheticLimitOrder): void {
-    // In production, emit through WebSocket gateway
-    console.log(`[EVENT] Order ${order.id} executed for user ${order.userId}`);
-  }
-
-  /**
-   * Get order statistics
-   */
-  getStatistics(): {
-    totalOrders: number;
-    activeOrders: number;
-    executedOrders: number;
-    expiredOrders: number;
-    failedOrders: number;
-  } {
-    const allOrders = Object.values(this.orders);
-
-    return {
-      totalOrders: allOrders.length,
-      activeOrders: allOrders.filter((o) => o.status === 'active').length,
-      executedOrders: allOrders.filter((o) => o.status === 'executed').length,
-      expiredOrders: allOrders.filter((o) => o.status === 'expired').length,
-      failedOrders: allOrders.filter((o) => o.status === 'failed').length,
-    };
-  }
-
-  /**
-   * Cleanup expired orders
-   */
-  async cleanupExpiredOrders(): Promise<number> {
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const [orderId, order] of Object.entries(this.orders)) {
-      if (order.status === 'expired' && now - order.expiresAt > 86400000) {
-        // Delete orders expired for more than 24 hours
-        delete this.orders[orderId];
-        this.stopMonitoring(orderId);
-        cleaned++;
-      }
-    }
-
-    this.logger.log(`Cleaned up ${cleaned} expired orders`);
-    return cleaned;
   }
 }

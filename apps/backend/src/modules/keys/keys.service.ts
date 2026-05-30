@@ -6,7 +6,11 @@ import { ApiKey } from './api-key.entity';
 
 @Injectable()
 export class KeysService {
-  private encryptionKey = process.env.ENCRYPTION_KEY || 'default-encryption-key-change-in-production';
+  private readonly algorithm = 'aes-256-gcm';
+  private readonly ivLength = 16;
+  private readonly saltLength = 64;
+  private readonly tagLength = 16;
+  private readonly encryptionKey = process.env.ENCRYPTION_KEY || 'default-encryption-key-must-be-32-chars-long-!!!';
 
   constructor(
     @InjectRepository(ApiKey)
@@ -28,10 +32,9 @@ export class KeysService {
 
     await this.keysRepository.save(apiKey);
 
-    // Return the secret only once
     return {
       ...apiKey,
-      encryptedSecret: secretKey, // Return plain secret only on creation
+      encryptedSecret: secretKey,
     };
   }
 
@@ -61,16 +64,6 @@ export class KeysService {
     await this.keysRepository.save(key);
   }
 
-  async validateKey(publicKey: string, signature: string): Promise<boolean> {
-    const key = await this.keysRepository.findOne({ where: { publicKey, isActive: true } });
-    if (!key) {
-      return false;
-    }
-
-    // Implement signature validation logic here
-    return true;
-  }
-
   private generatePublicKey(): string {
     return 'pk_' + crypto.randomBytes(16).toString('hex');
   }
@@ -80,16 +73,33 @@ export class KeysService {
   }
 
   private encryptSecret(secret: string): string {
-    const cipher = crypto.createCipher('aes-256-cbc', this.encryptionKey);
+    const iv = crypto.randomBytes(this.ivLength);
+    const salt = crypto.randomBytes(this.saltLength);
+    const key = crypto.scryptSync(this.encryptionKey, salt, 32);
+    
+    const cipher = crypto.createCipheriv(this.algorithm, key, iv);
     let encrypted = cipher.update(secret, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    
+    const tag = cipher.getAuthTag();
+    
+    return `${iv.toString('hex')}:${salt.toString('hex')}:${tag.toString('hex')}:${encrypted}`;
   }
 
-  private decryptSecret(encrypted: string): string {
-    const decipher = crypto.createDecipher('aes-256-cbc', this.encryptionKey);
+  private decryptSecret(encryptedData: string): string {
+    const [ivHex, saltHex, tagHex, encrypted] = encryptedData.split(':');
+    
+    const iv = Buffer.from(ivHex, 'hex');
+    const salt = Buffer.from(saltHex, 'hex');
+    const tag = Buffer.from(tagHex, 'hex');
+    const key = crypto.scryptSync(this.encryptionKey, salt, 32);
+    
+    const decipher = crypto.createDecipheriv(this.algorithm, key, iv);
+    decipher.setAuthTag(tag);
+    
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
+    
     return decrypted;
   }
 }
