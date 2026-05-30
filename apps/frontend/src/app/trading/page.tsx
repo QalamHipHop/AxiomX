@@ -1,5 +1,6 @@
 'use client';
 
+import { TradeTerminal } from '@/components/trading/TradeTerminal';
 import { useState, useEffect } from 'react';
 import { tradingAPI } from '@/services/api';
 
@@ -12,7 +13,6 @@ export default function TradingPage() {
   const [orderBook, setOrderBook] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // Load exchanges on mount
   useEffect(() => {
     const loadExchanges = async () => {
       try {
@@ -25,7 +25,6 @@ export default function TradingPage() {
     loadExchanges();
   }, []);
 
-  // Load markets when exchange changes
   useEffect(() => {
     const loadMarkets = async () => {
       if (!selectedExchange) return;
@@ -42,7 +41,6 @@ export default function TradingPage() {
     loadMarkets();
   }, [selectedExchange]);
 
-  // Load ticker and order book when market changes
   useEffect(() => {
     const loadMarketData = async () => {
       if (!selectedExchange || !selectedMarket) return;
@@ -64,106 +62,76 @@ export default function TradingPage() {
   }, [selectedExchange, selectedMarket]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#0f0f1e] to-[#1a1a2e] text-white p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold mb-8 text-gradient">Trading Terminal</h1>
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Trading Terminal</h1>
+        <div className="flex gap-4">
+          <select
+            value={selectedExchange}
+            onChange={(e) => setSelectedExchange(e.target.value)}
+            className="bg-card border border-border rounded-md px-3 py-1 text-sm"
+          >
+            {exchanges.map((ex) => (
+              <option key={ex} value={ex}>{ex.toUpperCase()}</option>
+            ))}
+          </select>
+          <select
+            value={selectedMarket}
+            onChange={(e) => setSelectedMarket(e.target.value)}
+            className="bg-card border border-border rounded-md px-3 py-1 text-sm"
+          >
+            {markets.slice(0, 100).map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-        {/* Controls */}
-        <div className="glass p-6 rounded-lg border border-[#00d4ff]/30 mb-8">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold mb-2">Exchange</label>
-              <select
-                value={selectedExchange}
-                onChange={(e) => setSelectedExchange(e.target.value)}
-                className="w-full bg-[#1a1a2e] border border-[#00d4ff]/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#00d4ff]"
-              >
-                {exchanges.map((exchange) => (
-                  <option key={exchange} value={exchange}>
-                    {exchange.toUpperCase()}
-                  </option>
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 lg:col-span-8 space-y-6">
+          <div className="bg-card border border-border rounded-lg h-[400px] flex items-center justify-center">
+            {ticker ? (
+              <div className="text-center">
+                <p className="text-4xl font-bold">${ticker.last?.toLocaleString()}</p>
+                <p className={`text-sm ${ticker.percentage >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {ticker.percentage?.toFixed(2)}% (24h)
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Select a market to view ticker</p>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-6">
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h3 className="text-sm font-medium mb-4 text-red-400">Asks</h3>
+              <div className="space-y-1">
+                {orderBook?.asks?.slice(0, 10).map((ask: any, i: number) => (
+                  <div key={i} className="flex justify-between text-xs">
+                    <span>{ask[0]}</span>
+                    <span className="text-muted-foreground">{ask[1]}</span>
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-semibold mb-2">Market</label>
-              <select
-                value={selectedMarket}
-                onChange={(e) => setSelectedMarket(e.target.value)}
-                className="w-full bg-[#1a1a2e] border border-[#00d4ff]/30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#00d4ff]"
-              >
-                {markets.slice(0, 50).map((market) => (
-                  <option key={market} value={market}>
-                    {market}
-                  </option>
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h3 className="text-sm font-medium mb-4 text-green-400">Bids</h3>
+              <div className="space-y-1">
+                {orderBook?.bids?.slice(0, 10).map((bid: any, i: number) => (
+                  <div key={i} className="flex justify-between text-xs">
+                    <span>{bid[0]}</span>
+                    <span className="text-muted-foreground">{bid[1]}</span>
+                  </div>
                 ))}
-              </select>
+              </div>
             </div>
           </div>
         </div>
-
-        {loading && <div className="text-center py-8">Loading market data...</div>}
-
-        {!loading && (
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Ticker Info */}
-            {ticker && (
-              <div className="glass p-6 rounded-lg border border-[#00d4ff]/30">
-                <h2 className="text-2xl font-bold mb-4">Ticker: {selectedMarket}</h2>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">Current Price:</span>
-                    <span className="font-semibold">${ticker.last?.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">24h High:</span>
-                    <span className="font-semibold">${ticker.high?.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">24h Low:</span>
-                    <span className="font-semibold">${ticker.low?.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-300">24h Volume:</span>
-                    <span className="font-semibold">{ticker.quoteVolume?.toFixed(0)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Order Book */}
-            {orderBook && (
-              <div className="glass p-6 rounded-lg border border-[#00d4ff]/30">
-                <h2 className="text-2xl font-bold mb-4">Order Book</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-semibold text-red-400 mb-2">Asks (Sell)</h3>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {orderBook.asks?.slice(0, 10).map((ask: any, i: number) => (
-                        <div key={i} className="flex justify-between text-sm text-gray-300">
-                          <span>{ask[0]?.toFixed(2)}</span>
-                          <span>{ask[1]?.toFixed(4)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-green-400 mb-2">Bids (Buy)</h3>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {orderBook.bids?.slice(0, 10).map((bid: any, i: number) => (
-                        <div key={i} className="flex justify-between text-sm text-gray-300">
-                          <span>{bid[0]?.toFixed(2)}</span>
-                          <span>{bid[1]?.toFixed(4)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        
+        <div className="col-span-12 lg:col-span-4">
+          <TradeTerminal />
+        </div>
       </div>
-    </main>
+    </div>
   );
 }

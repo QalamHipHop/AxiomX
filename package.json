@@ -3,10 +3,6 @@
   "version": "1.0.0",
   "description": "AxiomX — Non-Custodial Crypto Super Aggregator",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",

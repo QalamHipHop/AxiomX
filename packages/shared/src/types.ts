@@ -1,7 +1,4 @@
-/**
- * AxiomX Shared Types and Interfaces
- * Core data structures for the aggregator platform
- */
+import { z } from 'zod';
 
 export interface ExchangeConfig {
   id: string;
@@ -31,112 +28,37 @@ export interface Ticker {
   high: number;
   low: number;
   volume: number;
+  percentage?: number;
 }
 
-export interface TradeOrder {
+export const OrderSchema = z.object({
+  symbol: z.string(),
+  type: z.enum(['market', 'limit', 'synthetic-limit']),
+  side: z.enum(['buy', 'sell']),
+  amount: z.number().positive(),
+  price: z.number().optional(),
+  exchangeId: z.string(),
+});
+
+export type TradeOrder = z.infer<typeof OrderSchema> & {
   id: string;
-  exchange: string;
-  symbol: string;
-  type: 'market' | 'limit' | 'synthetic-limit';
-  side: 'buy' | 'sell';
-  amount: number;
-  price?: number;
   timestamp: number;
   status: 'pending' | 'open' | 'closed' | 'canceled' | 'failed';
   filled: number;
   remaining: number;
-  cost?: number;
-  fee?: number;
-  info?: any;
-}
-
-export interface RoutingPath {
-  exchange: string;
-  symbol: string;
-  price: number;
-  amount: number;
-  liquidity: number;
-  slippage: number;
-  gasCost?: number;
-  mevRisk: number;
-  fillProbability: number;
-  estimatedTime: number;
-}
+};
 
 export interface RoutingResult {
-  bestPath: RoutingPath;
-  alternativePaths: RoutingPath[];
+  bestPath: any;
+  alternativePaths: any[];
   totalPrice: number;
   totalSlippage: number;
-  estimatedFee: number;
-  recommendation: string;
   timestamp: number;
-}
-
-export interface TokenInfo {
-  address: string;
-  symbol: string;
-  name: string;
-  decimals: number;
-  chainId: number;
-  logoUrl?: string;
-  verified: boolean;
-}
-
-export interface TokenSecurityReport {
-  token: TokenInfo;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  risks: TokenRisk[];
-  score: number;
-  timestamp: number;
-}
-
-export interface TokenRisk {
-  type: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  description: string;
-  recommendation: string;
-}
-
-export interface SyntheticLimitOrder {
-  id: string;
-  userId: string;
-  symbol: string;
-  side: 'buy' | 'sell';
-  amount: number;
-  triggerPrice: number;
-  limitPrice: number;
-  createdAt: number;
-  expiresAt: number;
-  status: 'active' | 'triggered' | 'executed' | 'expired' | 'canceled';
-  executedAt?: number;
-}
-
-export interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-  key: string;
 }
 
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
-  timestamp: number;
-}
-
-export interface WebSocketMessage {
-  type: string;
-  channel: string;
-  data: any;
-  timestamp: number;
-}
-
-export interface PerformanceMetrics {
-  requestCount: number;
-  averageResponseTime: number;
-  cacheHitRate: number;
-  errorRate: number;
   timestamp: number;
 }

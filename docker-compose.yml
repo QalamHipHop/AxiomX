@@ -1,30 +1,33 @@
 version: '3.8'
 
 services:
-  postgres:
+  db:
     image: postgres:15-alpine
-    container_name: axiomx-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: axiomx
+      POSTGRES_PASSWORD: axiomx_password
+      POSTGRES_DB: axiomx
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: ${DB_USER:-user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-      POSTGRES_DB: ${DB_NAME:-axiomx_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-user} -d ${DB_NAME:-axiomx_db}"]
+      test: ["CMD-SHELL", "pg_isready -U axiomx -d axiomx"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: axiomx-redis
+    restart: always
+    command: redis-server --requirepass axiomx_redis_password
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "axiomx_redis_password", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,23 +36,29 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
-    container_name: axiomx-backend
-    ports:
-      - "3001:3000"
     environment:
-      - NODE_ENV=production
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=${DB_USER:-user}
-      - DB_PASSWORD=${DB_PASSWORD:-password}
-      - DB_NAME=${DB_NAME:-axiomx_db}
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=${JWT_SECRET:-super-secret-key-change-me}
+      DATABASE_URL: postgres://axiomx:axiomx_password@db:5432/axiomx
+      REDIS_URL: redis://:axiomx_redis_password@redis:6379
+      JWT_SECRET: axiomx_jwt_secret_key_change_me
+    ports:
+      - "3001:3001"
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
+  redis_data:
