@@ -14,11 +14,11 @@ AxiomX is a **fully non-custodial, AI-powered, multi-layer intelligent order-rou
 
 ### 2. Advanced Smart Routing Engine
 
-The platform’s proprietary Smart Routing Engine — built on graph theory, optimization algorithms, real-time stochastic modeling, and multi-objective decision functions — delivers mathematically optimal execution with minimal slippage, lowest effective fees, MEV protection, and maximum fill probability.
+The platform’s proprietary **Smart Routing Engine** (`@axiomx/routing-engine`) — built on graph theory, optimization algorithms, real-time stochastic modeling, and multi-objective decision functions — delivers mathematically optimal execution with minimal slippage, lowest effective fees, MEV protection, and maximum fill probability.
 
 ### 3. Extensive Token & Asset Coverage
 
-Supporting **10,000+ tokens** (including thousands of shitcoins and memes) across all major chains and emerging L2/L3 solutions. Features an Advanced Meme/Shitcoin Engine with multi-layer security scanner (RugCheck, Honeypot.is, GoPlus, Token Sniffer, etc.) and a dedicated Meme Hub.
+Supporting **10,000+ tokens** (including thousands of shitcoins and memes) across all major chains and emerging L2/L3 solutions. Features an **Advanced Token Security Scanner** (`@axiomx/security`) with multi-layer security analysis (RugCheck, Honeypot.is, GoPlus, Token Sniffer, etc.) and a dedicated Meme Hub.
 
 ### 4. Integrated Liquidity Sources
 
@@ -30,23 +30,29 @@ Connects to 50+ liquidity sources, including:
 
 ### 5. Comprehensive Order Types & Execution
 
-Supports Market, Limit, Stop-Limit, OCO, Trailing Stop, Iceberg, TWAP, VWAP, POV, Synthetic & Hybrid Orders, Intent-Based & Natural Language Trading. Powered by an Advanced Smart Routing Engine (Graph-based + Monte Carlo + Stochastic Optimization).
+Supports Market, Limit, Stop-Limit, OCO, Trailing Stop, Iceberg, TWAP, VWAP, POV, **Synthetic & Hybrid Orders**, Intent-Based & Natural Language Trading. Powered by an Advanced Smart Routing Engine (Graph-based + Monte Carlo + Stochastic Optimization).
 
 ### 6. AI & Quantitative Suite
 
 Includes Axiom AI Copilot, Advanced Trading Bots (DCA, Grid, Arbitrage, Sniping, etc.), AI Strategy Lab, Copy Trading Pro, and Portfolio Oracle with Monte Carlo simulations.
 
-### 7. Additional Features
+### 7. Real-time Data & Aggregated Order Book
+
+Features a **real-time Aggregated Multi-Venue Order Book** and price updates via WebSockets, providing a unified view of market depth and liquidity across all integrated exchanges.
+
+### 8. Additional Features
 
 Cross-chain Bridge Aggregator, Yield Optimizer, Advanced Analytics, TradingView + Aggregated Order Book, Mobile App, Telegram/Discord Bot, and Full Persian support.
 
 ## Technical Stack
 
-*   **Frontend:** Next.js 15 + Tailwind + shadcn/ui + TradingView + Wallet Connect
-*   **Backend:** NestJS (TypeScript) preferred
-*   **Core:** CCXT Pro, 1inch/Jupiter/Odos APIs, custom optimization solvers
-*   **Database:** PostgreSQL + Redis + TimescaleDB + ClickHouse
-*   **Security:** AES-256 + Vault, Zero Custody, Bug Bounty
+*   **Monorepo:** Turborepo
+*   **Shared Packages:** `@axiomx/shared`, `@axiomx/routing-engine`, `@axiomx/security`
+*   **Frontend:** Next.js 15 App Router, TypeScript, Tailwind CSS, shadcn/ui, TradingView, Zustand/Jotai, Wallet Connect 2.0, `socket.io-client`
+*   **Backend:** NestJS (TypeScript), Drizzle ORM (planned), BullMQ + Redis, CCXT Pro, `socket.io`
+*   **Real-time:** Heavy WebSocket usage
+*   **Database:** PostgreSQL + Redis + TimescaleDB + ClickHouse (planned)
+*   **Security:** AES-256 + Vault, Zero Custody, Bug Bounty, Enhanced API Key Management
 
 ## Development Standards
 
@@ -57,13 +63,15 @@ Cross-chain Bridge Aggregator, Yield Optimizer, Advanced Analytics, TradingView 
 *   **Documentation:** Well-documented code + OpenAPI/Swagger
 *   **Security:** Security-first (never log secrets, proper encryption, rate limiting)
 
-## Development Phases
+## Development Phases (Current Progress)
 
 1.  **Foundation:** Monorepo setup, professional README.md, docker-compose, env config.
 2.  **Core Backend:** NestJS + CCXT Pro integration + User & Key management.
-3.  **Routing Engine:** Smart multi-venue routing logic.
-4.  **Frontend:** Next.js Trade Terminal with Wallet Connect.
-5.  **Key Features:** Synthetic Orders, Security Scanner, AI Copilot basics.
+3.  **Monorepo Structure & Shared Packages:** Created `@axiomx/shared`, `@axiomx/routing-engine`, `@axiomx/security` packages.
+4.  **Smart Routing Engine:** Implemented core logic for multi-objective order routing.
+5.  **Key Modules:** Implemented Token Security Scanner, Synthetic Limit Order Engine, and Aggregated Multi-Venue Order Book.
+6.  **Backend Upgrade:** Enhanced NestJS services with Redis caching, WebSocket gateway, and improved API security.
+7.  **Frontend Upgrade:** Developed an advanced Next.js Trade Terminal with real-time data integration.
 
 ## Getting Started
 
@@ -84,7 +92,16 @@ To set up the project locally, follow these steps:
     ```
 4.  **Run the development servers:**
     ```bash
-    # Instructions for running backend and frontend will be added here.
+    # Build shared packages
+    npm run build --workspace=@axiomx/shared
+    npm run build --workspace=@axiomx/routing-engine
+    npm run build --workspace=@axiomx/security
+
+    # Start backend
+    npm run start --workspace=backend
+
+    # Start frontend
+    npm run dev --workspace=frontend
     ```
 
 ## Contributing

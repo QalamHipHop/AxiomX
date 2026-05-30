@@ -1,0 +1,20 @@
+{
+  "name": "@axiomx/security",
+  "version": "1.0.0",
+  "description": "Token Security Scanner for AxiomX - Detects risks in 10,000+ tokens including meme/shitcoins",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@axiomx/shared": "*",
+    "axios": "^1.6.0",
+    "ethers": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.1.0"
+  }
+}
