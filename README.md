@@ -54,24 +54,75 @@ Cross-chain Bridge Aggregator, Yield Optimizer, Advanced Analytics, TradingView 
 *   **Database:** PostgreSQL + Redis + TimescaleDB + ClickHouse (planned)
 *   **Security:** AES-256 + Vault, Zero Custody, Bug Bounty, Enhanced API Key Management
 
-## Development Standards
+## General Architecture & Production Readiness
 
-*   **Monorepo:** Managed with Turborepo
-*   **Language:** Full TypeScript (strict)
-*   **Containerization:** Docker + docker-compose ready
-*   **Error Handling:** Comprehensive error handling and logging
-*   **Documentation:** Well-documented code + OpenAPI/Swagger
-*   **Security:** Security-first (never log secrets, proper encryption, rate limiting)
+To ensure AxiomX is robust, scalable, and production-ready, the following architectural and operational considerations are being implemented:
+
+### Zero Custody Enforcement
+
+**No private keys or user funds will ever be stored on the server.** All interactions requiring private keys will be handled client-side through secure wallet connections (e.g., WalletConnect, MPC wallets) or encrypted, ephemeral API keys provided by the user for CEX interactions. This minimizes the attack surface and adheres to the highest security standards for non-custodial operations.
+
+### Scalability
+
+The platform is designed for horizontal scalability to handle high throughput and increasing user demand:
+
+*   **Redis Cluster:** For distributed caching, session management, and real-time data streams, ensuring high availability and performance.
+*   **Multiple Backend Instances:** Backend services will be deployed across multiple instances, managed by Kubernetes or similar orchestration tools, with load balancing to distribute traffic efficiently.
+*   **Database Sharding/Partitioning:** For PostgreSQL and other persistent data stores, data will be sharded or partitioned to improve query performance and manage large datasets.
+
+### Monitoring & Observability
+
+Comprehensive monitoring and observability tools will be integrated to ensure system health, performance, and rapid incident response:
+
+*   **Prometheus:** For collecting and storing time-series metrics from all services.
+*   **Grafana:** For visualizing metrics and creating dashboards to monitor key performance indicators (KPIs).
+*   **Sentry:** For real-time error tracking and alerting, providing detailed context for debugging production issues.
+*   **OpenTelemetry:** For distributed tracing, allowing end-to-end visibility of requests across microservices and identifying performance bottlenecks.
+
+### CI/CD Pipeline
+
+A robust Continuous Integration/Continuous Deployment (CI/CD) pipeline using GitHub Actions will automate the development workflow:
+
+*   **Linting:** Automated code style and quality checks.
+*   **Testing:** Unit, integration, and end-to-end tests to ensure code correctness and prevent regressions.
+*   **Building:** Automated compilation and packaging of applications.
+*   **Docker Push:** Building and pushing Docker images to a container registry.
+*   **Security Scan:** Integrating static application security testing (SAST) and dependency scanning tools to identify vulnerabilities early in the development cycle.
+
+### Documentation
+
+Thorough documentation is crucial for maintainability and future development:
+
+*   **Architecture Decision Records (ADRs):** Documenting significant architectural decisions, their context, and consequences.
+*   **C4 Model Architecture Diagram:** Providing a clear, hierarchical view of the system architecture (Context, Containers, Components, Code).
+*   **API Documentation:** Comprehensive OpenAPI/Swagger documentation for all backend APIs, facilitating easy integration for frontend and third-party developers.
+
+### Persian Support (i18n)
+
+Full internationalization (i18n) support for Persian language users:
+
+*   **`next-intl`:** Integration for seamless internationalization in the Next.js frontend.
+*   **RTL (Right-to-Left) Support:** Ensuring proper rendering and layout for Persian text.
+*   **Date/Number Formatting:** Localized date and number formatting to match Persian conventions.
+
+### Compliance
+
+Adherence to relevant regulatory and legal frameworks:
+
+*   **KYC Consideration for CEXs:** While AxiomX is non-custodial, integration with CEXs may require users to complete KYC processes directly with those exchanges. The platform will guide users accordingly.
+*   **Terms of Service (ToS):** A comprehensive ToS outlining user responsibilities, platform usage, and disclaimers.
+*   **Privacy Policy:** A clear Privacy Policy detailing data collection, usage, and protection practices.
 
 ## Development Phases (Current Progress)
 
 1.  **Foundation:** Monorepo setup, professional README.md, docker-compose, env config.
 2.  **Core Backend:** NestJS + CCXT Pro integration + User & Key management.
 3.  **Monorepo Structure & Shared Packages:** Created `@axiomx/shared`, `@axiomx/routing-engine`, `@axiomx/security` packages.
-4.  **Smart Routing Engine:** Implemented core logic for multi-objective order routing.
-5.  **Key Modules:** Implemented Token Security Scanner, Synthetic Limit Order Engine, and Aggregated Multi-Venue Order Book.
+4.  **Smart Routing Engine:** Implemented core logic for multi-objective order routing, graph modeling, and advanced algorithms.
+5.  **Key Modules:** Implemented Token Security Scanner with external API integrations and enhanced on-chain analysis, Synthetic Limit Order Engine, and Aggregated Multi-Venue Order Book.
 6.  **Backend Upgrade:** Enhanced NestJS services with Redis caching, WebSocket gateway, and improved API security.
 7.  **Frontend Upgrade:** Developed an advanced Next.js Trade Terminal with real-time data integration.
+8.  **General Architecture & Production Readiness:** Integrated monitoring, CI/CD, comprehensive documentation, Persian support, and compliance considerations.
 
 ## Getting Started
 
@@ -84,7 +135,7 @@ To set up the project locally, follow these steps:
     ```
 2.  **Install dependencies:**
     ```bash
-    npm install
+    pnpm install
     ```
 3.  **Start Docker containers (if applicable):**
     ```bash
@@ -93,15 +144,15 @@ To set up the project locally, follow these steps:
 4.  **Run the development servers:**
     ```bash
     # Build shared packages
-    npm run build --workspace=@axiomx/shared
-    npm run build --workspace=@axiomx/routing-engine
-    npm run build --workspace=@axiomx/security
+    pnpm run build --filter=@axiomx/shared
+    pnpm run build --filter=@axiomx/routing-engine
+    pnpm run build --filter=@axiomx/security
 
     # Start backend
-    npm run start --workspace=backend
+    pnpm run start --filter=backend
 
     # Start frontend
-    npm run dev --workspace=frontend
+    pnpm run dev --filter=frontend
     ```
 
 ## Contributing

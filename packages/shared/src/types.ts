@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Chain, PublicClient } from 'viem';
 
 export interface ExchangeConfig {
   id: string;
@@ -48,11 +49,27 @@ export type TradeOrder = z.infer<typeof OrderSchema> & {
   remaining: number;
 };
 
+export interface RoutingPath {
+  exchange: string;
+  symbol: string;
+  price: number;
+  amount: number;
+  liquidity: number;
+  slippage: number;
+  gasCost: number;
+  mevRisk: number;
+  fillProbability: number;
+  estimatedTime: number;
+  hops?: { venue: string; type: 'CEX' | 'DEX'; amount: number; price: number }[];
+}
+
 export interface RoutingResult {
-  bestPath: any;
-  alternativePaths: any[];
+  bestPath: RoutingPath;
+  alternativePaths: RoutingPath[];
   totalPrice: number;
   totalSlippage: number;
+  estimatedFee: number;
+  recommendation: string;
   timestamp: number;
 }
 
@@ -60,5 +77,34 @@ export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
+  timestamp: number;
+}
+
+export interface CacheEntry<T> {
+  key: string;
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+export interface TokenInfo {
+  address: string;
+  chainId: number;
+  symbol?: string;
+  name?: string;
+}
+
+export interface TokenRisk {
+  type: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  recommendation: string;
+}
+
+export interface TokenSecurityReport {
+  token: TokenInfo;
+  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  risks: TokenRisk[];
+  score: number;
   timestamp: number;
 }
