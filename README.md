@@ -162,3 +162,7 @@ We welcome contributions! Please see our `CONTRIBUTING.md` for more details.
 ## License
 
 This project is licensed under the ISC License.
+
+## Author
+
+**Qalam**

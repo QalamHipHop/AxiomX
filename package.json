@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AxiomX — Non-Custodial Crypto Super Aggregator",
   "private": true,
+  "author": "Qalam",
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=18.0.0",
