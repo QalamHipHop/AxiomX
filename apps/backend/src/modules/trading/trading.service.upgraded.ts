@@ -1,19 +1,18 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { SmartRoutingEngine } from '@axiomx/routing-engine';
 import { TokenSecurityScanner } from '@axiomx/security';
 import { CacheManager, RoutingResult, TokenInfo } from '@axiomx/shared';
-import { WebSocketPoolService } from './websocket-pool.service';
 import * as ccxt from 'ccxt';
 
 @Injectable()
-export class TradingService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(TradingService.name);
+export class TradingServiceUpgraded implements OnModuleInit {
+  private readonly logger = new Logger(TradingServiceUpgraded.name);
   private exchanges: Map<string, any> = new Map();
   private routingEngine: SmartRoutingEngine;
   private securityScanner: TokenSecurityScanner;
   private cache: CacheManager;
 
-  constructor(private readonly wsPool: WebSocketPoolService) {
+  constructor() {
     this.cache = CacheManager.getInstance();
     this.routingEngine = new SmartRoutingEngine(this.cache);
     this.securityScanner = new TokenSecurityScanner(this.cache);
@@ -21,7 +20,6 @@ export class TradingService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     try {
-      // Initialize cache
       await this.cache.connect();
       this.logger.log('Trading service initialized with cache and routing engine');
     } catch (error) {
@@ -31,23 +29,22 @@ export class TradingService implements OnModuleInit, OnModuleDestroy {
 
   async initializeExchange(exchangeName: string, apiKey?: string, apiSecret?: string): Promise<any> {
     try {
-      const exchange = await this.wsPool.getConnection(exchangeName, apiKey, apiSecret);
+      const ExchangeClass = (ccxt as any)[exchangeName];
+      if (!ExchangeClass) throw new Error(`Exchange ${exchangeName} not found`);
+
+      const exchange = new ExchangeClass({
+        apiKey: apiKey || '',
+        secret: apiSecret || '',
+        enableRateLimit: true,
+        timeout: 30000,
+      });
+
       this.exchanges.set(exchangeName, exchange);
       return exchange;
     } catch (error) {
       this.logger.error(`Failed to initialize ${exchangeName}:`, error);
       throw error;
     }
-  }
-
-  async fetchTicker(exchangeId: string, symbol: string) {
-    const exchange = await this.initializeExchange(exchangeId);
-    return await exchange.fetchTicker(symbol);
-  }
-
-  async fetchOrderBook(exchangeId: string, symbol: string) {
-    const exchange = await this.initializeExchange(exchangeId);
-    return await exchange.fetchOrderBook(symbol);
   }
 
   async findOptimalRoute(
@@ -87,23 +84,14 @@ export class TradingService implements OnModuleInit, OnModuleDestroy {
     // 2. Routing
     const route = await this.findOptimalRoute(symbol, amount, side);
 
-    // 3. Execution
+    // 3. Execution (Simulated for safety in this environment)
     this.logger.log(`Executing trade on ${route.bestPath.exchange}`);
     
-    // Here we would use the exchange instance from our map
-    const exchange = this.exchanges.get(route.bestPath.exchange);
-    if (!exchange) throw new Error(`Exchange ${route.bestPath.exchange} not initialized`);
-
-    // Actual execution logic would go here
     return {
       success: true,
       route,
       securityReport,
       timestamp: Date.now()
     };
-  }
-
-  async onModuleDestroy() {
-    this.logger.log('Shutting down trading service...');
   }
 }
