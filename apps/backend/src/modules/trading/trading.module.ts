@@ -1,25 +1,20 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { TradingService } from './trading.service';
 import { TradingController } from './trading.controller';
-import { SyntheticLimitOrderService } from './synthetic-limit-order.service';
+import { TradingService } from './trading.service';
+import { WebSocketPoolService } from './websocket-pool.service';
+import { TradingGateway } from './trading.gateway';
 import { OrderBookAggregatorService } from './order-book-aggregator.service';
-import { SyntheticLimitOrderEntity } from './synthetic-limit-order.entity';
+import { SyntheticLimitOrderService } from './synthetic-limit-order.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SyntheticLimitOrderEntity])],
-  providers: [
-    TradingService, 
-    TradingServiceUpgraded,
-    SyntheticLimitOrderService, 
-    OrderBookAggregatorService
-  ],
   controllers: [TradingController],
-  exports: [
-    TradingService, 
-    TradingServiceUpgraded,
-    SyntheticLimitOrderService, 
-    OrderBookAggregatorService
+  providers: [
+    TradingService,
+    WebSocketPoolService,
+    TradingGateway,
+    OrderBookAggregatorService,
+    SyntheticLimitOrderService,
   ],
+  exports: [TradingService, WebSocketPoolService],
 })
 export class TradingModule {}
