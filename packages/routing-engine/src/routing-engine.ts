@@ -1,5 +1,4 @@
-import { ExchangeConfig, OrderBook, RoutingPath, RoutingResult, CacheManager, TokenInfo } from '@axiomx/shared';
-import { createClient } from 'redis';
+import { CacheManager, ExchangeConfig, OrderBook, RoutingPath, RoutingResult } from '@axiomx/shared';
 import { Chain, PublicClient, createPublicClient, http } from 'viem';
 import { mainnet, arbitrum, optimism, polygon, base, zora } from 'viem/chains';
 import ccxt from 'ccxt';
@@ -36,7 +35,7 @@ export interface RoutingContext {
   mevProtection: boolean;
   timeout: number;
   optimizationTarget: 'price' | 'speed' | 'safety' | 'balanced';
-  splitOrderEnabled: boolean;
+  splitOrderEnabled?: boolean;
   maxSplitParts?: number;
 }
 
@@ -65,10 +64,8 @@ export class SmartRoutingEngine {
   private initializePublicClients() {
     const chains = [mainnet, arbitrum, optimism, polygon, base, zora];
     chains.forEach(chain => {
-      this.publicClients.set(chain.id, createPublicClient({
-        chain,
-        transport: http()
-      }));
+      const client = createPublicClient({ chain, transport: http() }) as unknown as PublicClient;
+      this.publicClients.set(chain.id, client);
     });
   }
 
@@ -154,7 +151,7 @@ export class SmartRoutingEngine {
       let optimizedPaths = this.applyOptimization(allPaths, context);
 
       // 4. Split Order Logic
-      if (context.splitOrderEnabled && optimizedPaths.length > 1) {
+      if ((context.splitOrderEnabled ?? false) && optimizedPaths.length > 1) {
         optimizedPaths = this.applySplitOrderLogic(optimizedPaths, context);
       }
 
@@ -189,9 +186,20 @@ export class SmartRoutingEngine {
 
     const promises = targets.map(async (id) => {
       try {
-        // In production, this calls CCXT Pro or Direct API
-        const exchange = new ccxt[id](); // Instantiate CCXT exchange
-        return await exchange.fetchOrderBook(context.symbol); // Use CCXT to fetch order book
+        const ExchangeClass = (ccxt as unknown as Record<string, new (config?: Record<string, unknown>) => {
+          fetchOrderBook: (symbol: string) => Promise<{ bids: Array<[number, number]>; asks: Array<[number, number]>; timestamp?: number }>;
+        }>)[id];
+        if (!ExchangeClass) return null;
+        const config = this.exchanges.get(id);
+        const exchange = new ExchangeClass({
+          apiKey: config?.apiKey,
+          secret: config?.apiSecret,
+          enableRateLimit: config?.enableRateLimit ?? true,
+          timeout: config?.timeout ?? context.timeout,
+          sandbox: config?.sandbox ?? false,
+        });
+        const book = await exchange.fetchOrderBook(context.symbol);
+        return { exchange: id, symbol: context.symbol, timestamp: book.timestamp ?? Date.now(), bids: book.bids ?? [], asks: book.asks ?? [] };
       } catch {
         return null;
       }
@@ -213,6 +221,25 @@ export class SmartRoutingEngine {
     }
   }
 
+  private calculateExecution(levels: Array<[number, number]>, amount: number): { price: number; liquidity: number; slippage: number } | null {
+    if (amount <= 0 || levels.length === 0) return null;
+    const bestPrice = levels[0][0];
+    let remaining = amount;
+    let notional = 0;
+    let filled = 0;
+    for (const [price, available] of levels) {
+      if (price <= 0 || available <= 0) continue;
+      const fill = Math.min(remaining, available);
+      notional += fill * price;
+      filled += fill;
+      remaining -= fill;
+      if (remaining <= 0) break;
+    }
+    if (filled <= 0) return null;
+    const averagePrice = notional / filled;
+    return { price: averagePrice, liquidity: filled, slippage: Math.abs((averagePrice - bestPrice) / bestPrice) * 100 };
+  }
+
   private generateAllPaths(orderBooks: OrderBook[], context: RoutingContext): RoutingPath[] {
     const paths: RoutingPath[] = [];
 
@@ -223,23 +250,21 @@ export class SmartRoutingEngine {
 
       if (levels.length === 0) continue;
 
-      // Basic implementation: find price for full amount
-      // In production, this performs VWAP calculation across levels
-      const executionPrice = levels[0][0];
-      const slippage = Math.abs((executionPrice - levels[0][0]) / levels[0][0]) * 100;
+      const execution = this.calculateExecution(levels, context.amount);
+      if (!execution) continue;
 
       paths.push({
         exchange: ob.exchange,
         symbol: context.symbol,
-        price: executionPrice,
+        price: execution.price,
         amount: context.amount,
-        liquidity: levels[0][1],
-        slippage,
+        liquidity: execution.liquidity,
+        slippage: execution.slippage,
         gasCost: 0,
         mevRisk: context.mevProtection ? 0.01 : 0.5,
         fillProbability: metrics.reliability * Math.min(1, levels[0][1] / context.amount),
         estimatedTime: metrics.latency,
-        hops: [{ venue: ob.exchange, type: 'CEX', amount: context.amount, price: executionPrice }],
+          hops: [{ venue: ob.exchange, type: 'CEX', amount: context.amount, price: execution.price }],
       });
     }
 
@@ -273,10 +298,13 @@ export class SmartRoutingEngine {
 
   private applyOptimization(paths: RoutingPath[], context: RoutingContext): RoutingPath[] {
     const weights = this.getOptimizationWeights(context.optimizationTarget);
+    const prices = paths.map(path => path.price).filter(Number.isFinite);
+    const bestPrice = context.side === 'buy' ? Math.min(...prices) : Math.max(...prices);
+    const worstPrice = context.side === 'buy' ? Math.max(...prices) : Math.min(...prices);
 
     return paths
       .map(path => {
-        const score = this.calculatePathScore(path, weights, context);
+        const score = this.calculatePathScore(path, weights, context, bestPrice, worstPrice);
         return { path, score };
       })
       .filter(item => item.path.slippage <= context.maxSlippage)
@@ -342,9 +370,12 @@ export class SmartRoutingEngine {
     }
   }
 
-  private calculatePathScore(path: RoutingPath, weights: any, context: RoutingContext): number {
-    // Score components (normalized 0-1)
-    const priceScore = 1.0; // Normalized against best price in set
+  private calculatePathScore(path: RoutingPath, weights: any, context: RoutingContext, bestPrice: number, worstPrice: number): number {
+    // Score components normalized against the current candidate set.
+    const range = Math.max(Math.abs(worstPrice - bestPrice), Number.EPSILON);
+    const priceScore = context.side === 'buy'
+      ? Math.max(0, Math.min(1, (worstPrice - path.price) / range))
+      : Math.max(0, Math.min(1, (path.price - worstPrice + range) / range));
     const speedScore = Math.max(0, 1 - path.estimatedTime / 1000);
     const safetyScore = path.fillProbability * (1 - path.mevRisk);
 

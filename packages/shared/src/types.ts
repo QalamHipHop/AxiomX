@@ -1,14 +1,15 @@
-import { z } from 'zod';
 import { Chain, PublicClient } from 'viem';
+import { z } from 'zod';
 
 export interface ExchangeConfig {
   id: string;
   name: string;
   apiKey?: string;
   apiSecret?: string;
-  enableRateLimit: boolean;
-  timeout: number;
+  enableRateLimit?: boolean;
+  timeout?: number;
   sandbox?: boolean;
+  enabled?: boolean;
 }
 
 export interface OrderBook {

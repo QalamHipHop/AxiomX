@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as crypto from 'crypto';
 
+export interface BiometricData {
+  biometricHash?: string;
+  deviceAnchor?: string;
+  authProofs?: string[];
+  [key: string]: unknown;
+}
+
 export interface IdentityGenome {
   foundation: {
     biometricHash: string;
@@ -43,6 +50,22 @@ export class AxiomIDService {
     
     this.logger.log(`Generated new Identity Field Formula: ${formula.substring(0, 16)}...`);
     return formula;
+  }
+
+  generateIdentityFormula(data: BiometricData): string {
+    const genome: IdentityGenome = {
+      foundation: { biometricHash: data.biometricHash ?? '', deviceAnchor: data.deviceAnchor ?? '', authProofs: data.authProofs ?? [] },
+      behavioral: { interactionRhythms: 0.5, consistencyScore: 0.5, engagementMetrics: data },
+      trust: { relationships: [], reputationScore: 0.5, reliabilityHistory: [] },
+      evolution: { progressionHistory: [], growthTrajectory: 0.5, lastUpdated: Date.now() },
+      contribution: { ecosystemParticipation: 0.5, governanceEngagement: 0.5, valueCreated: 0.5 },
+    };
+    return this.generateIdentityField(genome);
+  }
+
+  calculateIdentityValue(formula: string): number {
+    const digest = crypto.createHash('sha256').update(formula).digest();
+    return Number((digest.readUInt32BE(0) / 0xffffffff).toFixed(6));
   }
 
   /**

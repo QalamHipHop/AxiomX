@@ -50,6 +50,24 @@ export class TradingService implements OnModuleInit, OnModuleDestroy {
     return await exchange.fetchOrderBook(symbol);
   }
 
+  async getAllExchanges(): Promise<Array<{ id: string; name: string; initialized: boolean }>> {
+    return Array.from(this.exchanges.entries()).map(([id, exchange]) => ({
+      id,
+      name: exchange.name ?? id,
+      initialized: true,
+    }));
+  }
+
+  getExchangeInfo(exchangeName: string): { id: string; name: string; initialized: boolean; capabilities: string[] } {
+    const exchange = this.exchanges.get(exchangeName);
+    return {
+      id: exchangeName,
+      name: exchange?.name ?? exchangeName,
+      initialized: Boolean(exchange),
+      capabilities: exchange ? ['fetchTicker', 'fetchOrderBook'] : [],
+    };
+  }
+
   async findOptimalRoute(
     symbol: string,
     amount: number,

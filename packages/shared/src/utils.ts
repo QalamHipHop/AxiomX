@@ -122,8 +122,8 @@ export function deepMerge<T extends Record<string, any>>(
         source[key] !== null &&
         !Array.isArray(source[key])
       ) {
-        result[key] = deepMerge(
-          result[key] || {},
+        (result as Record<string, any>)[key] = deepMerge(
+          (result as Record<string, any>)[key] || {},
           source[key] as Record<string, any>
         );
       } else {

@@ -7,7 +7,13 @@ import { createClient, RedisClientType } from 'redis';
 import { CacheEntry } from './types';
 
 export class CacheManager {
+  private static instance: CacheManager | null = null;
   private client: RedisClientType;
+
+  static getInstance(redisUrl?: string): CacheManager {
+    if (!CacheManager.instance) CacheManager.instance = new CacheManager(redisUrl);
+    return CacheManager.instance;
+  }
   private isConnected: boolean = false;
   private localCache: Map<string, CacheEntry<any>> = new Map();
 
